@@ -1,0 +1,63 @@
+#!/usr/bin/bash
+set -e
+set -x
+
+#https://factorio.com/get-download/latest/headless/linux64
+#https://factorio.com/get-download/0.17.75/headless/linux64
+
+echo hello world
+
+SERVERS=/var/lib/factorio-manager/servers
+BINARIES=/var/lib/factorio-manager/binaries
+TARBALLS=/var/lib/factorio-manager/tarballs
+#/etc/factorio-manager/<name>/
+
+#/usr/lib/sysuser.d/factorio-manager.conf
+#/usr/lib/tmpfiles.d/factorio-manager.conf
+#/usr/lib/systemd/system/factorio-manager.service
+
+ensure_version () {
+  local VERSION=$1
+  local DIR="$BINARIES/$VERSION"
+  local TARBALL="$TARBALLS/factorio_headless_x64_$VERSION.tar.xz"
+
+  # download tarball
+  if [[ ! -f "$TARBALL" ]]; then
+    echo "tarball doesn't exist...grabbing"
+    (cd "$TARBALLS" && curl -OJL "https://factorio.com/get-download/$VERSION/headless/linux64")
+  fi
+
+  # extract tarball
+  if [[ ! -d "$DIR" ]]; then
+    echo "extracted dir doesn't exist...extracting"
+    echo "$DIR"
+    mkdir "$DIR"
+    tar xf "$TARBALL" --strip-components 1 -C "$DIR"
+    "$DIR/bin/x64/factorio" --start-server "" || true # create default config
+  fi
+}
+
+create_server () {
+  local NAME=$1
+  local VERSION=$2
+
+  ensure_version "$VERSION"
+
+  local DIR="$SERVERS/$NAME"
+  if [[ ! -d "$DIR" ]]; then
+    echo "creating server $DIR"
+    mkdir "$DIR"
+    cp -r "$BINARIES/$VERSION/config" "$DIR/"
+    sed -i "s~write-data=__PATH__executable__/\.\./\.\.~write-data=$DIR~" "$DIR/config/config.ini"
+  fi
+}
+
+exec_server () {
+  create_server "$1" "$2"
+  "$BINARIES/$2/bin/x64/factorio" -c "$SERVERS/$1/config/config.ini" "${@:3}"
+}
+
+#ensure_version "0.17.68"
+
+#create_server new_server 0.17.69
+exec_server "$@"
