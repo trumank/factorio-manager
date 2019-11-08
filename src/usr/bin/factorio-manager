@@ -1,22 +1,23 @@
 #!/usr/bin/bash
 set -e
-set -x
+#set -x
+
+trap "exit" INT TERM
+trap "kill 0" EXIT
 
 #https://factorio.com/get-download/latest/headless/linux64
 #https://factorio.com/get-download/0.17.75/headless/linux64
 
-echo hello world
-
 SERVERS=/var/lib/factorio-manager/servers
 BINARIES=/var/lib/factorio-manager/binaries
 TARBALLS=/var/lib/factorio-manager/tarballs
-#/etc/factorio-manager/<name>/
+CONFIGS=/etc/factorio-manager
 
 #/usr/lib/sysuser.d/factorio-manager.conf
 #/usr/lib/tmpfiles.d/factorio-manager.conf
 #/usr/lib/systemd/system/factorio-manager.service
 
-ensure_version () {
+ensure_version() {
   local VERSION=$1
   local DIR="$BINARIES/$VERSION"
   local TARBALL="$TARBALLS/factorio_headless_x64_$VERSION.tar.xz"
@@ -24,7 +25,7 @@ ensure_version () {
   # download tarball
   if [[ ! -f "$TARBALL" ]]; then
     echo "tarball doesn't exist...grabbing"
-    (cd "$TARBALLS" && curl -OJL "https://factorio.com/get-download/$VERSION/headless/linux64")
+    (cd "$TARBALLS" && curl -fsSOJL "https://factorio.com/get-download/$VERSION/headless/linux64")
   fi
 
   # extract tarball
@@ -33,11 +34,11 @@ ensure_version () {
     echo "$DIR"
     mkdir "$DIR"
     tar xf "$TARBALL" --strip-components 1 -C "$DIR"
-    "$DIR/bin/x64/factorio" --start-server "" || true # create default config
+    "$DIR/bin/x64/factorio" --start-server "" || true # start onces to create default config
   fi
 }
 
-create_server () {
+create_server() {
   local NAME=$1
   local VERSION=$2
 
@@ -47,17 +48,147 @@ create_server () {
   if [[ ! -d "$DIR" ]]; then
     echo "creating server $DIR"
     mkdir "$DIR"
+    mkdir "$DIR/saves"
+    mkdir "$DIR/archive"
+    mkfifo "$DIR/fifo"
+
     cp -r "$BINARIES/$VERSION/config" "$DIR/"
     sed -i "s~write-data=__PATH__executable__/\.\./\.\.~write-data=$DIR~" "$DIR/config/config.ini"
   fi
 }
 
-exec_server () {
-  create_server "$1" "$2"
-  "$BINARIES/$2/bin/x64/factorio" -c "$SERVERS/$1/config/config.ini" "${@:3}"
+exec_server() {
+  local NAME=$1
+  local VERSION=$2
+  create_server "$NAME" "$VERSION"
+  local FIFO="$SERVERS/$NAME/fifo"
+  "$BINARIES/$VERSION/bin/x64/factorio" -c "$SERVERS/$NAME/config/config.ini" "${@:3}" #>"$FIFO"
 }
+
+get_latest_map() {
+  ls -tA "$SERVERS/$1/saves" | head -1
+}
+
+init_server() {
+  local NAME=$1
+  local SERVER="$SERVERS/$NAME"
+  local LATEST=$(get_latest_map "$NAME")
+  if [[ -n "$LATEST" ]]; then
+    echo "already has existing map"
+    return 1
+  else
+    exec_server "$NAME" "$2" --create "$SERVER/saves/map.zip"
+  fi
+}
+reset_server() {
+  archive_server "${@:1}"
+  init_server "${@:1}"
+}
+archive_server() {
+  local NAME=$1
+  local SERVER="$SERVERS/$NAME"
+  local LATEST=$(get_latest_map "$NAME")
+  if [[ -n "$LATEST" ]]; then
+    mv --backup=t "$SERVER/saves/$LATEST" "$SERVER/archive/$(date -u +"%FT%H%MZ").zip"
+    find "$SERVER/saves/" -mindepth 1 -delete
+  fi
+}
+start_server() {
+  local NAME=$1
+  local LATEST=$(get_latest_map "$NAME")
+  if [[ -z "$LATEST" ]]; then
+    init_server "$1" "$2"
+  fi
+
+  trap "echo trapped" USR1
+
+  #local DONE=false
+
+  cleanup() {
+    if [[ -n $PID ]]; then
+      kill $PID
+      archive_server "$1" "$2"
+    fi
+  }
+
+  while :; do
+    local NAME=$1
+    local VERSION=$2
+    create_server "$NAME" "$VERSION"
+    local FIFO="$SERVERS/$NAME/fifo"
+    "$BINARIES/$VERSION/bin/x64/factorio" -c "$SERVERS/$NAME/config/config.ini" exec_server "$1" "$2" --start-server-load-latest &
+
+    local PID=$!
+    set +e
+    wait $PID
+    kill $PID
+    local STATUS=$?
+    wait $PID
+    set -e
+    if [[ $STATUS -eq 0 ]]; then
+      while kill -0 $PID;do sleep 1;done;
+      echo WHAT THE ***REMOVED***
+      reset_server "$1" "$2"
+      continue
+    else
+      break
+    fi
+  done
+}
+
+run() {
+  local NAME=$2
+  if [[ -f "$CONFIGS/servers/$NAME/config" ]]; then
+    . "$CONFIGS/servers/$NAME/config"
+  fi
+
+  case "$1" in
+    create)
+      create_server "$NAME" "$version"
+      ;;
+    init)
+      init_server "$NAME" "$version"
+      ;;
+    reset)
+      reset_server "$NAME" "$version"
+      ;;
+    archive)
+      archive_server "$NAME" "$version"
+      ;;
+    start)
+      start_server "$NAME" "$version"
+      ;;
+  esac
+}
+
+echo "THIS IS $$"
+
+run $@
+
+# sudo -u factorio-manager factorio-manager <command> <name>
+# sudo -u factorio-manager src/usr/bin/factorio-manager start new-server
 
 #ensure_version "0.17.68"
 
 #create_server new_server 0.17.69
-exec_server "$@"
+#exec_server "$@"
+#exec_server_env "$@"
+
+#case "$1" in
+  #exec)
+    ## Starts the server
+    #if is_running; then
+      #echo "Server already running."
+      #exit 0
+    #else
+       #if ! start_service; then
+         #echo "Could not start $SERVICE_NAME"
+         #exit 1
+       #fi
+    #fi
+    #;;
+#
+  #start)
+    #do_stuff
+    #;;
+#esac
