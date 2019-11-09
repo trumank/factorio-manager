@@ -91,7 +91,13 @@ start_server() {
     init_server "$1" "$2"
   fi
 
-  trap "" USR1
+  trap stop USR1
+
+  stop() {
+    if [[ $PID -ne 0 ]]; then
+      kill $PID
+    fi
+  }
 
   while :; do
     local NAME=$1
@@ -103,17 +109,9 @@ start_server() {
     local PID=$!
     set +e
     wait $PID
-    kill $PID
-    local STATUS=$?
-    wait $PID
     set -e
-    if [[ $STATUS -eq 0 ]]; then
-      while kill -0 $PID;do sleep 1;done;
-      reset_server "$1" "$2"
-      continue
-    else
-      break
-    fi
+    while kill -0 $PID;do sleep 1;done;
+    reset_server "$1" "$2"
   done
 }
 
