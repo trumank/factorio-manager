@@ -41,6 +41,8 @@ create_server() {
     mkdir "$DIR"
     mkdir "$DIR/saves"
     mkdir "$DIR/archive"
+    mkdir "$DIR/scenarios"
+    ln -s "$CONFIGS/servers/$NAME/scenario" "$DIR/scenarios/scenario"
     mkfifo "$DIR/fifo"
 
     cp -r "$BINARIES/$VERSION/config" "$DIR/"
@@ -63,7 +65,10 @@ init_server() {
   local NAME=$1
   local SERVER="$SERVERS/$NAME"
   local LATEST=$(get_latest_map "$NAME")
-  if [[ -n "$LATEST" ]]; then
+  if [[ -e "$SERVER/scenarios/scenario" ]]; then
+    echo "scenario exists and will be loaded on start"
+    return
+  elif [[ -n "$LATEST" ]]; then
     echo "already has existing map"
     return 1
   else
@@ -84,6 +89,7 @@ archive_server() {
   fi
 }
 start_server() {
+  create_server "$1" "$2"
   local NAME=$1
   local LATEST=$(get_latest_map "$NAME")
   if [[ -z "$LATEST" ]]; then
@@ -101,9 +107,19 @@ start_server() {
   while :; do
     local NAME=$1
     local VERSION=$2
-    create_server "$NAME" "$VERSION"
     local FIFO="$SERVERS/$NAME/fifo"
-    "$BINARIES/$VERSION/bin/x64/factorio" -c "$SERVERS/$NAME/config/config.ini" exec_server "$1" "$2" --start-server-load-latest <>"$FIFO" &
+    local CMD=("$BINARIES/$VERSION/bin/x64/factorio" -c "$SERVERS/$NAME/config/config.ini")
+
+    local LATEST=$(get_latest_map "$NAME")
+    if [[ -n "$LATEST" ]]; then
+      CMD+=(--start-server-load-latest)
+    elif [[ -e "$SERVERS/$NAME/scenarios/scenario" ]]; then
+      CMD+=(--start-server-load-scenario scenario)
+    else
+      echo "missing map and scenario"
+      return 1
+    fi
+    "${CMD[@]}" <>"$FIFO" &
 
     local PID=$!
     set +e
