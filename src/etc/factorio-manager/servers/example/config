@@ -1,3 +1,4 @@
 version=experimental
-port=34195
-rcon=44195
+bind=34195
+rcon_bind=127.0.0.1:44195
+rcon_password=changeme
