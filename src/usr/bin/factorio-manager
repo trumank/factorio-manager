@@ -1,6 +1,5 @@
 #!/usr/bin/bash
 set -e
-set -x
 
 trap "exit" INT TERM
 trap "kill 0" EXIT
