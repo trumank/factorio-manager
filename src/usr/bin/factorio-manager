@@ -149,6 +149,3 @@ run() {
 }
 
 run $@
-
-# sudo -u factorio-manager factorio-manager <command> <name>
-# sudo -u factorio-manager src/usr/bin/factorio-manager start new-server
