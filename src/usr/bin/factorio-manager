@@ -115,6 +115,23 @@ start_server() {
       echo "missing map and scenario"
       return 1
     fi
+    if [[ -n "$bind" ]]; then
+      if [[ "$bind" =~ ":" ]]; then
+	CMD+=(--bind "$bind")
+      else
+	CMD+=(--port "$bind")
+      fi
+    fi
+    if [[ -n "$rcon_bind" ]]; then
+      if [[ "$rcon_bind" =~ ":" ]]; then
+	CMD+=(--rcon-bind "$rcon_bind")
+      else
+	CMD+=(--rcon-port "$rcon_bind")
+      fi
+    fi
+    if [[ -n "$rcon_password" ]]; then
+      CMD+=(--rcon-password "$rcon_password")
+    fi
     "${CMD[@]}" <>"$FIFO" &
 
     local PID=$!
