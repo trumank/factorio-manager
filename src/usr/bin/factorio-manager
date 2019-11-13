@@ -61,24 +61,6 @@ get_latest_map() {
   ls -tA "$SERVERS/$1/saves" | head -1
 }
 
-init_server() {
-  local NAME=$1
-  local SERVER="$SERVERS/$NAME"
-  local LATEST=$(get_latest_map "$NAME")
-  if [[ -e "$SERVER/scenarios/scenario" ]]; then
-    echo "scenario exists and will be loaded on start"
-    return
-  elif [[ -n "$LATEST" ]]; then
-    echo "already has existing map"
-    return 1
-  else
-    exec_server "$NAME" "$2" --create "$SERVER/saves/map.zip"
-  fi
-}
-reset_server() {
-  archive_server "${@:1}"
-  init_server "${@:1}"
-}
 archive_server() {
   local NAME=$1
   local SERVER="$SERVERS/$NAME"
@@ -89,12 +71,11 @@ archive_server() {
   fi
 }
 start_server() {
-  create_server "$1" "$2"
   local NAME=$1
-  local LATEST=$(get_latest_map "$NAME")
-  if [[ -z "$LATEST" ]]; then
-    init_server "$1" "$2"
-  fi
+  local VERSION=$2
+  local SERVER="$SERVERS/$NAME"
+  local CONFIG="$CONFIGS/servers/$NAME"
+  create_server "$NAME" "$VERSION"
 
   trap stop USR1
 
@@ -105,15 +86,30 @@ start_server() {
   }
 
   while :; do
-    local NAME=$1
-    local VERSION=$2
-    local FIFO="$SERVERS/$NAME/fifo"
-    local CMD=("$BINARIES/$VERSION/bin/x64/factorio" -c "$SERVERS/$NAME/config/config.ini")
+    local FIFO="$SERVER/fifo"
+    local CMD=("$BINARIES/$VERSION/bin/x64/factorio" -c "$SERVER/config/config.ini")
+    if [[ -e "$CONFIG/server-settings.json" ]]; then
+      CMD+=(--server-settings "$CONFIG/server-settings.json")
+    fi
+    if [[ -e "$CONFIG/server-whitelist.json" ]]; then
+      CMD+=(--use-server-whitelist --server-whitelist "$CONFIG/server-whitelist.json")
+    fi
+    if [[ -e "$CONFIG/map-settings.json" ]]; then
+      CMD+=(--map-settings "$CONFIG/map-settings.json")
+    fi
+    if [[ -e "$CONFIG/map-gen-settings.json" ]]; then
+      CMD+=(--map-gen-settings "$CONFIG/map-gen-settings.json")
+    fi
+
+    local LATEST=$(get_latest_map "$NAME")
+    if [[ -z "$LATEST" ]] && [[ ! -e "$SERVER/scenarios/scenario" ]]; then
+      "${CMD[@]}" --create "$SERVER/saves/map.zip"
+    fi
 
     local LATEST=$(get_latest_map "$NAME")
     if [[ -n "$LATEST" ]]; then
       CMD+=(--start-server-load-latest)
-    elif [[ -e "$SERVERS/$NAME/scenarios/scenario" ]]; then
+    elif [[ -e "$SERVER/scenarios/scenario" ]]; then
       CMD+=(--start-server-load-scenario scenario)
     else
       echo "missing map and scenario"
@@ -126,7 +122,7 @@ start_server() {
     wait $PID
     set -e
     while kill -0 $PID;do sleep 1;done;
-    reset_server "$1" "$2"
+    archive_server "$NAME" "$SERVER"
   done
 }
 
@@ -145,12 +141,6 @@ run() {
   case "$1" in
     create)
       create_server "$NAME" "$version"
-      ;;
-    init)
-      init_server "$NAME" "$version"
-      ;;
-    reset)
-      reset_server "$NAME" "$version"
       ;;
     archive)
       archive_server "$NAME" "$version"
