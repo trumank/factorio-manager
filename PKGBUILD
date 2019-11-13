@@ -7,5 +7,7 @@ arch=('x86_64')
 license=('GPL')
 
 package() {
-	cp -r . "${pkgdir}"
+  cp -r . "${pkgdir}"
+
+  chgrp -R 258 "${pkgdir}"/etc/factorio-manager
 }
