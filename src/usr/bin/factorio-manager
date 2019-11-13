@@ -123,7 +123,7 @@ run() {
     version=$(curl -s --head https://factorio.com/get-download/stable/headless/linux64 | grep -oP '(?<=factorio_headless_x64_)\d+\.\d+\.\d+(?=\.tar\.xz)')
   fi
   if [[ "$version" = "experimental" ]]; then
-    version=$(curl -s --head https://factorio.com/get-download/experimental/headless/linux64 | grep -oP '(?<=factorio_headless_x64_)\d+\.\d+\.\d+(?=\.tar\.xz)')
+    version=$(curl -s --head https://factorio.com/get-download/latest/headless/linux64 | grep -oP '(?<=factorio_headless_x64_)\d+\.\d+\.\d+(?=\.tar\.xz)')
   fi
 
   case "$1" in
