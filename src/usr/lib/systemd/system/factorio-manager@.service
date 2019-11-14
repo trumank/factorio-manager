@@ -6,3 +6,6 @@ Group=factorio-manager
 User=factorio-manager
 KillMode=process
 ExecStart=/usr/bin/factorio-manager start %i
+
+[Install]
+WantedBy=multi-user.target
