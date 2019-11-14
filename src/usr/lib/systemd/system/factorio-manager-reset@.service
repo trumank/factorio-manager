@@ -1,0 +1,5 @@
+[Unit]
+Description="Factorio Server reset (%i)"
+
+[Service]
+ExecStart=/usr/bin/systemctl kill -s USR1 factorio-manager@%i.service
