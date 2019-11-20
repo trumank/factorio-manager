@@ -75,12 +75,14 @@ start_server() {
   local VERSION=$2
   local SERVER="$SERVERS/$NAME"
   local CONFIG="$CONFIGS/servers/$NAME"
+  local RESET=false
   create_server "$NAME" "$VERSION"
 
   trap stop USR1
 
   stop() {
     if [[ $PID -ne 0 ]]; then
+      RESET=true
       kill $PID
     fi
   }
@@ -139,7 +141,12 @@ start_server() {
     wait $PID
     set -e
     while kill -0 $PID;do sleep 1;done;
-    archive_server "$NAME" "$SERVER"
+    if [[ "$RESET" = true ]]; then
+      archive_server "$NAME" "$SERVER"
+    else
+      sleep 1
+    fi
+    RESET=false
   done
 }
 
