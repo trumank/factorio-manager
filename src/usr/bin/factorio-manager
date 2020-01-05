@@ -1,8 +1,16 @@
 #!/usr/bin/bash
 set -e
 
+cleanup() {
+  if [[ -n "$PID" ]]; then
+    kill $PID
+    wait $PID
+  fi
+  kill 0
+}
+
 trap "exit" INT TERM
-trap "kill 0" EXIT
+trap "cleanup" EXIT
 
 SERVERS=/var/lib/factorio-manager/servers
 BINARIES=/var/lib/factorio-manager/binaries
@@ -136,7 +144,7 @@ start_server() {
     fi
     "${CMD[@]}" <>"$FIFO" &
 
-    local PID=$!
+    PID=$!
     set +e
     wait $PID
     set -e
