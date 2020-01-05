@@ -1,6 +1,10 @@
 #!/usr/bin/bash
 set -e
 
+if [[ $(whoami) != factorio-manager ]]; then
+  exec sudo -u factorio-manager "$0" "$@"
+fi
+
 cleanup() {
   if [[ -n "$PID" ]]; then
     kill $PID
