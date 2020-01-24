@@ -7,8 +7,8 @@ fi
 
 cleanup() {
   if [[ -n "$PID" ]]; then
-    kill $PID
-    wait $PID
+    kill "$PID"
+    wait "$PID"
   fi
   kill 0
 }
@@ -75,7 +75,8 @@ get_latest_map() {
 archive_server() {
   local NAME=$1
   local SERVER="$SERVERS/$NAME"
-  local LATEST=$(get_latest_map "$NAME")
+  local LATEST
+  LATEST=$(get_latest_map "$NAME")
   if [[ -n "$LATEST" ]]; then
     mv --backup=t "$SERVER/saves/$LATEST" "$SERVER/archive/$(date -u +"%FT%H%MZ").zip"
     find "$SERVER/saves/" -mindepth 1 -delete
@@ -94,7 +95,7 @@ start_server() {
   stop() {
     if [[ $PID -ne 0 ]]; then
       RESET=true
-      kill $PID
+      kill "$PID"
     fi
   }
 
@@ -114,12 +115,13 @@ start_server() {
       CMD+=(--map-gen-settings "$CONFIG/map-gen-settings.json")
     fi
 
-    local LATEST=$(get_latest_map "$NAME")
+    local LATEST
+    LATEST=$(get_latest_map "$NAME")
     if [[ -z "$LATEST" ]] && [[ ! -e "$SERVER/scenarios/scenario" ]]; then
       "${CMD[@]}" --create "$SERVER/saves/map.zip"
     fi
 
-    local LATEST=$(get_latest_map "$NAME")
+    LATEST=$(get_latest_map "$NAME")
     if [[ -n "$LATEST" ]]; then
       CMD+=(--start-server-load-latest)
     elif [[ -e "$SERVER/scenarios/scenario" ]]; then
@@ -189,4 +191,4 @@ run() {
   esac
 }
 
-run $@
+run "$@"
