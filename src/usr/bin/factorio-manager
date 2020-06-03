@@ -163,6 +163,36 @@ start_server() {
   done
 }
 
+rcon_server() {
+  if ! command -v mcrcon; then
+    echo "install mcrcon for shell"
+    return 1
+  fi
+  local NAME=$1
+  if [[ -f "$CONFIGS/servers/$NAME/config" ]]; then
+    . "$CONFIGS/servers/$NAME/config"
+  else
+    echo "server doesn't exist or is missing config"
+    return 1
+  fi
+  if [[ -z "$rcon_bind" ]]; then
+    echo "rcon_bind not set"
+    return 1
+  fi
+  if [[ -z "$rcon_password" ]]; then
+    echo "rcon_password not set"
+    return 1
+  fi
+  if [[ "$rcon_bind" =~ ":" ]]; then
+    [[ $rcon_bind =~ ^(.*):([0-9]+)$ ]]
+    MCRCON_HOST=${BASH_REMATCH[1]} MCRCON_PORT=${BASH_REMATCH[2]} MCRCON_PASS=$rcon_password mcrcon
+    return
+  else
+    MCRCON_PORT=$rcon_bind MCRCON_PASS=$rcon_password mcrcon
+    return
+  fi
+}
+
 run() {
   local NAME=$2
   if [[ -f "$CONFIGS/servers/$NAME/config" ]]; then
@@ -187,6 +217,9 @@ run() {
       ;;
     exec)
       exec_server "$NAME" "$version" "${@:3}"
+      ;;
+    rcon)
+      rcon_server "$NAME"
       ;;
   esac
 }

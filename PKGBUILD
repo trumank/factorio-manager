@@ -11,3 +11,5 @@ package() {
 
   chgrp -R 258 "${pkgdir}"/etc/factorio-manager
 }
+
+optdepends=('mcrcon: RCON shell')
