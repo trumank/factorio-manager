@@ -29,7 +29,7 @@ ensure_version() {
   # download tarball
   if [[ ! -f "$TARBALL" ]]; then
     echo "tarball doesn't exist...grabbing"
-    (cd "$TARBALLS" && curl -fsSOJL "https://factorio.com/get-download/$VERSION/headless/linux64")
+    curl -fsSLo "$TARBALL" "https://factorio.com/get-download/$VERSION/headless/linux64"
   fi
 
   # extract tarball
@@ -88,6 +88,7 @@ start_server() {
   local SERVER="$SERVERS/$NAME"
   local CONFIG="$CONFIGS/servers/$NAME"
   local RESET=false
+  local PIDFILE="$SERVERS/$NAME/factorio.pid"
   create_server "$NAME" "$VERSION"
 
   trap stop USR1
@@ -150,6 +151,7 @@ start_server() {
     "${CMD[@]}" <>"$FIFO" &
 
     PID=$!
+    echo "$PID" > "$PIDFILE"
     set +e
     wait $PID
     set -e
